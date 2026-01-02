@@ -1,11 +1,12 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.validation.BuildOperations;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -16,7 +17,7 @@ import java.util.Map;
 @RequestMapping("/users")
 public class UserController {
 
-    private final Map<Long, User> users = new HashMap<>();
+    private final Map<Integer, User> users = new HashMap<>();
 
     @GetMapping
     public Collection<User> findAll() {
@@ -24,7 +25,7 @@ public class UserController {
     }
 
     @PostMapping
-    public User create(@Valid @RequestBody User user) {
+    public User create(@Validated(BuildOperations.class) @RequestBody User user) {
         if (user.getName() == null || user.getName().isBlank()) {
            user.setName(user.getLogin());
         }
@@ -35,9 +36,10 @@ public class UserController {
     }
 
     @PutMapping
-    public User update(@Valid @RequestBody User newUser) {
+    public User updateUser(@RequestBody User newUser) {
         // проверяем необходимые условия
-        if (newUser.getId() == null) {
+        int id = newUser.getId();
+        if (!users.containsKey(id)) {
             log.warn("Ошибка при обновлении пользователя {}: Должен быть указан id (идентификатор)", newUser);
             throw new ValidationException("Должен быть указан id (идентификатор)");
         }
@@ -67,8 +69,8 @@ public class UserController {
     }
 
     // вспомогательный метод для генерации идентификатора нового пользователя
-    private long getNextId() {
-        long currentMaxId = users.keySet()
+    private int getNextId() {
+        int currentMaxId = (int) users.keySet()
                 .stream()
                 .mapToLong(id -> id)
                 .max()

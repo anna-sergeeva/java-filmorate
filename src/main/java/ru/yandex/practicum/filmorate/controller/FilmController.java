@@ -1,11 +1,12 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
+import ru.yandex.practicum.filmorate.Dto.FilmUpdateDto;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.validation.BuildOperations;
 
 import java.time.*;
 import java.util.Collection;
@@ -25,8 +26,10 @@ public class FilmController {
         return films.values();
     }
 
+
     @PostMapping
-    public Film create(@Valid @RequestBody Film film) {
+    public Film create(@Validated(BuildOperations.class) @RequestBody Film film) {
+        validateFilmReleaseDate(film);
         film.setId(getNextId());
         films.put(film.getId(), film);
         log.info("Создан фильм {}", film);
@@ -34,31 +37,29 @@ public class FilmController {
     }
 
     @PutMapping
-    public Film update(@Valid @RequestBody Film newFilm) {
+    public void update(Film existingFilm, FilmUpdateDto newFilm) {
         // проверяем необходимые условия
-        if (newFilm.getId() == null) {
-            log.warn("Ошибка при обновлении фильма {}: Должен быть указан id (идентификатор)", newFilm);
-            throw new ValidationException("Должен быть указан id (идентификатор)");
+        if (newFilm.getName() != null && !newFilm.getName().isBlank()) {
+            existingFilm.setName(newFilm.getName());
         }
-        if (films.containsKey(newFilm.getId())) {
-            Film oldFilm = films.get(newFilm.getId());
-            if (newFilm.getReleaseDate() != null) {
-                oldFilm.setReleaseDate(newFilm.getReleaseDate());
+        if (newFilm.getDescription() != null) {
+            // Валидация длины описания
+            if (newFilm.getDescription().length() > 200) {
+                log.warn("Валидация фильма не пройдена: описание длиннее 200 символов");
+                throw new ValidationException("Максимальная длина описания — 200 символов");
             }
-            if (newFilm.getName() != null) {
-                oldFilm.setName(newFilm.getName());
-            }
-            if (newFilm.getDuration() != null) {
-                oldFilm.setDuration(newFilm.getDuration());
-            }
-            if (newFilm.getDescription() != null) {
-                oldFilm.setDescription(newFilm.getDescription());
-            }
-            log.info("Фильм {} обновлен", oldFilm);
-            return oldFilm;
+            existingFilm.setDescription(newFilm.getDescription());
         }
-        log.warn("Фильм с id = {} не найден", newFilm.getId());
-        throw new NotFoundException("Фильм с id = " + newFilm.getId() + " не найден");
+        if (newFilm.getReleaseDate() != null) {
+            // Создаем временный объект Film для валидации даты
+            Film tempFilm = new Film();
+            tempFilm.setReleaseDate(newFilm.getReleaseDate());
+            validateFilmReleaseDate(tempFilm);
+            existingFilm.setReleaseDate(newFilm.getReleaseDate());
+        }
+        if (newFilm.getDuration() > 0) {
+            existingFilm.setDuration(newFilm.getDuration());
+        }
     }
 
     // вспомогательный метод для генерации идентификатора нового пользователя
@@ -69,5 +70,12 @@ public class FilmController {
                 .max()
                 .orElse(0);
         return ++currentMaxId;
+    }
+
+    private void validateFilmReleaseDate(Film film) {
+        if (film.getReleaseDate() != null && film.getReleaseDate().isBefore(minReleaseDate)) {
+            log.warn("Валидация фильма не пройдена: дата релиза {} раньше {}", film.getReleaseDate(), minReleaseDate);
+            throw new ValidationException("Дата релиза не раньше 28 декабря 1895 года");
+        }
     }
 }

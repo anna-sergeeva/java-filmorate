@@ -1,27 +1,25 @@
 package ru.yandex.practicum.filmorate.model;
 
 import jakarta.validation.constraints.*;
-import lombok.Builder;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
-
+import ru.yandex.practicum.filmorate.validation.BuildOperations;
+import ru.yandex.practicum.filmorate.validation.UpdateOperations;
 import java.time.LocalDate;
 
 @Data
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Builder(toBuilder = true)
 public class User {
-    @EqualsAndHashCode.Include
-    Long id;
-    @Email
-    @NotNull
-    @NotBlank
-    String email;
-    @NotNull
-    @NotBlank
-    @Pattern(regexp = "\\S+", message = "Логин не должен содержать пробелов")
-    String login;
-    String name;
-    @PastOrPresent
-    LocalDate birthday;
+    private int id;
+
+    @NotBlank(message = "Электронная почта не может быть пустой", groups = {BuildOperations.class})
+    @Email(message = "Электронная почта должна содержать символ @ и быть корректной", groups = {BuildOperations.class, UpdateOperations.class})
+    private String email;
+
+    @NotBlank(message = "Логин не может быть пустым", groups = {BuildOperations.class})
+    @Pattern(regexp = "\\S+", message = "Логин не может содержать пробелы", groups = {BuildOperations.class, UpdateOperations.class})
+    private String login;
+
+    private String name;
+
+    @PastOrPresent(message = "Дата рождения не может быть в будущем", groups = {BuildOperations.class, UpdateOperations.class})
+    private LocalDate birthday;
 }
