@@ -1,13 +1,13 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.Dto.FilmUpdateDto;
+import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
 import ru.yandex.practicum.filmorate.validation.BuildOperations;
-
 import java.time.*;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,30 +37,33 @@ public class FilmController {
     }
 
     @PutMapping
-    public void update(Film existingFilm, FilmUpdateDto newFilm) {
+    public Film update(@Valid @RequestBody Film newFilm) {
         // проверяем необходимые условия
-        if (newFilm.getName() != null && !newFilm.getName().isBlank()) {
-            existingFilm.setName(newFilm.getName());
+        if (newFilm.getId() == null) {
+            log.warn("Ошибка при обновлении фильма {}: Должен быть указан id (идентификатор)", newFilm);
+            throw new ValidationException("Должен быть указан id (идентификатор)");
         }
-        if (newFilm.getDescription() != null) {
-            // Валидация длины описания
-            if (newFilm.getDescription().length() > 200) {
-                log.warn("Валидация фильма не пройдена: описание длиннее 200 символов");
-                throw new ValidationException("Максимальная длина описания — 200 символов");
+        if (films.containsKey(newFilm.getId())) {
+            Film oldFilm = films.get(newFilm.getId());
+            if (newFilm.getReleaseDate() != null) {
+                oldFilm.setReleaseDate(newFilm.getReleaseDate());
             }
-            existingFilm.setDescription(newFilm.getDescription());
+            if (newFilm.getName() != null) {
+                oldFilm.setName(newFilm.getName());
+            }
+            if (newFilm.getDuration() != null) {
+                oldFilm.setDuration(newFilm.getDuration());
+            }
+            if (newFilm.getDescription() != null) {
+                oldFilm.setDescription(newFilm.getDescription());
+            }
+            log.info("Фильм {} обновлен", oldFilm);
+            return oldFilm;
         }
-        if (newFilm.getReleaseDate() != null) {
-            // Создаем временный объект Film для валидации даты
-            Film tempFilm = new Film();
-            tempFilm.setReleaseDate(newFilm.getReleaseDate());
-            validateFilmReleaseDate(tempFilm);
-            existingFilm.setReleaseDate(newFilm.getReleaseDate());
-        }
-        if (newFilm.getDuration() > 0) {
-            existingFilm.setDuration(newFilm.getDuration());
-        }
+        log.warn("Фильм с id = {} не найден", newFilm.getId());
+        throw new NotFoundException("Фильм с id = " + newFilm.getId() + " не найден");
     }
+
 
     // вспомогательный метод для генерации идентификатора нового пользователя
     private long getNextId() {
